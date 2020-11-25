@@ -9,6 +9,7 @@ This module is used to show all cameras on fullscreen
 import xbmc, xbmcaddon, xbmcvfs, xbmcgui
 import threading, os,  requests#, time
 from urllib import urlretrieve
+from requests.auth import HTTPDigestAuth
 import settings, monitor, utils
 from resources.lib.ipcam_api_wrapper import CameraAPIWrapper as Camera
 import socket
@@ -139,8 +140,15 @@ class AllCameraDisplay(xbmcgui.WindowDialog):
             
             try:
                 filename = os.path.join(_datapath, '%s_%s.%d.jpg') %(prefix, camera.number, x)
-                urlretrieve(url, filename)
-                
+                if '4' in camera.number:  #DIGEST IS ONLY ENABLED ON CAMERA 4
+					r = requests.get(url, stream = True, timeout = TIMEOUT, auth=HTTPDigestAuth('USERNAME', 'PASSWORD')) #You must define your user and password here!!!
+					with open(filename, 'wb') as fd:
+						for chunk in r.iter_content(chunk_size=128):
+							fd.write(chunk)
+							
+                else:
+					urlretrieve(url, filename)
+                                
                 if os.path.exists(filename): 
                     control[0].setImage(filename, useCache = False)                
                     xbmcvfs.delete(os.path.join(_datapath, '%s_%s.%d.jpg') %(prefix, camera.number, x - 1))

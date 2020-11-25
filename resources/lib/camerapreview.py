@@ -10,6 +10,7 @@ import xbmc, xbmcaddon, xbmcgui, xbmcvfs
 import os, requests, time
 import utils, settings, cameraplayer, allcameraplayer, monitor
 from urllib import urlretrieve
+from requests.auth import HTTPDigestAuth
 import threading
 import socket
 TIMEOUT = settings.getSetting_int('request_timeout')
@@ -123,7 +124,6 @@ class CameraPreviewWindow(xbmcgui.WindowDialog):
         
         if url == '':
             url = self.camera.getStreamUrl(2, stream_type)
-
         utils.log(2, 'Camera %s :: Preview Window Opened - Manual: %s;  Stream Type: %d;  URL: %s' %(self.camera.number, self.monitor.openRequest_manual(self.camera.number), stream_type, url))
         
         if stream_type == 0:
@@ -234,8 +234,8 @@ class CameraPreviewWindow(xbmcgui.WindowDialog):
         """ Update camera position with mjpeg frames """
      
         try:
-            stream = requests.get(url, stream = True, timeout = TIMEOUT).raw
-            
+#            stream = requests.get(url, stream = True, timeout = TIMEOUT, auth=HTTPDigestAuth('USERNAME', 'PASSWORD')).raw #uncomment if you need digest support for mjpeg
+            stream = requests.get(url, stream = True, timeout = TIMEOUT).raw           
         except requests.RequestException as e:
             utils.log(3, e)
             self.img1.setImage(_error, useCache = False)
@@ -265,13 +265,20 @@ class CameraPreviewWindow(xbmcgui.WindowDialog):
 
     def getImagesSnapshot(self, url, *args, **kwargs):
         """ Update camera position with snapshots """
-        
+ 
         x = 0
         while not self.monitor.abortRequested() and not self.monitor.stopped() and self.monitor.previewOpened(self.camera.number):
             
             try:
                 filename = os.path.join(_datapath, '%s_%s.%d.jpg') %(self.prefix, self.camera.number, x)
-                urlretrieve(url, filename)
+                if '4' in self.camera.number:  #DIGEST IS ONLY ENABLED ON CAMERA 4
+					r = requests.get(url, stream = True, timeout = TIMEOUT, auth=HTTPDigestAuth('USERNAME', 'PASSWORD')) #You must define your user and password here!!!
+					with open(filename, 'wb') as fd:
+						for chunk in r.iter_content(chunk_size=128):
+							fd.write(chunk)
+							
+                else:
+					urlretrieve(url, filename)
                 
                 if os.path.exists(filename): 
                     self.img1.setImage(filename, useCache = False)                
